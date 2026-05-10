@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  nombre       String    @db.VarChar(255)
+  plan         Plan      @default(free)
+  waSessionId  String?   @map("wa_session_id") @db.VarChar(255)
+  waConnected  Boolean   @default(false) @map("wa_connected")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  contactLists ContactList[]
+  campaigns    Campaign[]
+  templates    Template[]
+
+  @@map("users")
+}
+
+enum Plan {
+  free
+  starter
+  pro
+}
+
+model ContactList {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  userId    Int       @map("user_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user     User      @relation(fields: [userId], references: [id])
+  contacts Contact[]
+
+  @@map("contact_lists")
+}
+
+model Contact {
+  id        Int       @id @default(autoincrement())
+  phone     String    @db.VarChar(20)
+  name      String?   @db.VarChar(255)
+  tags      String[]  @default([])
+  optedOut  Boolean   @default(false) @map("opted_out")
+  listId    Int       @map("list_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  list             ContactList       @relation(fields: [listId], references: [id], onDelete: Cascade)
+  campaignMessages CampaignMessage[]
+
+  @@unique([phone, listId])
+  @@map("contacts")
+}
+
+model Template {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  body      String   @db.Text
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("templates")
+}
+
+model Campaign {
+  id          Int             @id @default(autoincrement())
+  name        String          @db.VarChar(255)
+  messageBody String          @map("message_body") @db.Text
+  mediaUrl    String?         @map("media_url") @db.Text
+  scheduledAt DateTime?       @map("scheduled_at")
+  status      CampaignStatus  @default(draft)
+  userId      Int             @map("user_id")
+  listId      Int             @map("list_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  user     User              @relation(fields: [userId], references: [id])
+  messages CampaignMessage[]
+
+  @@map("campaigns")
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sending
+  completed
+  failed
+}
+
+model CampaignMessage {
+  id         Int            @id @default(autoincrement())
+  campaignId Int            @map("campaign_id")
+  contactId  Int            @map("contact_id")
+  status     MessageStatus  @default(queued)
+  sentAt     DateTime?      @map("sent_at")
+  error      String?        @db.Text
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id])
+
+  @@map("campaign_messages")
+}
+
+enum MessageStatus {
+  queued
+  sending
+  sent
+  delivered
+  read
+  failed
+}
